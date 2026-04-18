@@ -349,6 +349,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Contact form route
+
+  // POST /api/contact - Submit contact form message
+  app.post("/api/contact", async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { name, email, message } = z.object({
+        name: z.string().min(1, "Name is required"),
+        email: z.string().email("Valid email required"),
+        message: z.string().min(1, "Message is required"),
+      }).parse(req.body);
+
+      const { getUncachableResendClient } = await import("./services/resend-client");
+
+      const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      const teamEmail = process.env.ASSISTANCE_NOTIFICATION_EMAIL || 'tab_rashid@hotmail.co.uk';
+      const { client, fromEmail } = await getUncachableResendClient();
+
+      await client.emails.send({
+        from: fromEmail,
+        to: teamEmail,
+        subject: `[IW Contact] Message from ${name}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #1a5c2e;">Contact Form Message</h2>
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 16px 0;">
+              <p><strong>Name:</strong> ${esc(name)}</p>
+              <p><strong>Email:</strong> <a href="mailto:${esc(email)}">${esc(email)}</a></p>
+              <p><strong>Message:</strong></p>
+              <p style="white-space: pre-wrap;">${esc(message)}</p>
+            </div>
+          </div>
+        `,
+        text: `Contact Form Message\n\nName: ${name}\nEmail: ${email}\nMessage: ${message}`,
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      next(error);
+    }
+  });
+
+  // Assistance Request routes (Route 2 & 3 - personal guidance)
+
+  // POST /api/assistance-request - Submit request for personal guidance
+  app.post("/api/assistance-request", async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { name, email, phone, message, currentStep } = z.object({
+        name: z.string().min(1, "Name is required"),
+        email: z.string().email("Valid email required"),
+        phone: z.string().min(1, "Phone number is required"),
+        message: z.string().optional(),
+        currentStep: z.number().min(1).max(9),
+      }).parse(req.body);
+
+      const request = await storage.createAssistanceRequest({
+        name,
+        email,
+        phone,
+        message: message || null,
+        currentStep,
+        willId: null,
+        status: "pending",
+        resolvedAt: null,
+      });
+
+      // Send notification email to team (Tabs)
+      const { sendAssistanceNotification } = await import("./services/onboarding");
+      sendAssistanceNotification({ name, email, phone, message, currentStep }).catch((error) => {
+        console.error('Assistance notification email error:', error);
+      });
+
+      res.json({ success: true, requestId: request.id });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      next(error);
+    }
+  });
+
+  // GET /api/admin/assistance-requests - Get all assistance requests (ADMIN ONLY)
+  app.get("/api/admin/assistance-requests", requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const requests = await storage.getAssistanceRequests();
+      res.json({ requests });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // PATCH /api/admin/assistance-requests/:id - Update request status (ADMIN ONLY)
+  app.patch("/api/admin/assistance-requests/:id", requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { status } = z.object({
+        status: z.enum(["pending", "contacted", "resolved"]),
+      }).parse(req.body);
+
+      const updated = await storage.updateAssistanceRequest(id, {
+        status,
+        resolvedAt: status === "resolved" ? new Date() : null,
+      });
+      res.json({ request: updated });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      next(error);
+    }
+  });
+
   // Stripe Payment Routes
 
   // GET /api/stripe/publishable-key - Get Stripe publishable key

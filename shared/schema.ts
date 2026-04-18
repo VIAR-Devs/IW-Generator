@@ -207,3 +207,24 @@ export const insertScheduledJobSchema = createInsertSchema(scheduledJobs).omit({
   createdAt: true,
 });
 export type InsertScheduledJob = z.infer<typeof insertScheduledJobSchema>;
+
+// Assistance Requests Table (Route 2 & 3 - users needing personal guidance)
+export const assistanceRequests = pgTable("assistance_requests", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  email: varchar("email", { length: 255 }).notNull(),
+  phone: varchar("phone", { length: 20 }).notNull(),
+  message: text("message"),
+  currentStep: integer("current_step").notNull(),
+  willId: integer("will_id").references(() => wills.id),
+  status: varchar("status", { length: 20 }).notNull().default("pending"), // 'pending', 'contacted', 'resolved'
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  resolvedAt: timestamp("resolved_at"),
+});
+
+export type AssistanceRequest = typeof assistanceRequests.$inferSelect;
+export const insertAssistanceRequestSchema = createInsertSchema(assistanceRequests).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertAssistanceRequest = z.infer<typeof insertAssistanceRequestSchema>;

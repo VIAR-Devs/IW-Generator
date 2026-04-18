@@ -8,15 +8,20 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useState } from "react";
 import { Link } from "wouter";
-import { 
-  Mail, 
-  CheckCircle2, 
-  XCircle, 
-  Clock, 
-  Users, 
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Mail,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Users,
   Send,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  Phone,
+  MessageSquare
 } from "lucide-react";
 
 interface OnboardingStats {
@@ -27,6 +32,22 @@ interface OnboardingStats {
   followUpEmailsSent: number;
   followUpEmailsFailed: number;
 }
+
+interface AssistanceRequest {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  message: string | null;
+  currentStep: number;
+  status: string;
+  createdAt: string;
+}
+
+const stepNames = [
+  '', 'Basic Details', 'Executors', 'Guardians', 'Funeral',
+  'Wasiyyah', 'Heirs', 'Add-Ons', 'Review', 'Payment'
+];
 
 export default function AdminDashboard() {
   const { toast } = useToast();
@@ -61,6 +82,31 @@ export default function AdminDashboard() {
       });
     },
   });
+
+  const { data: assistanceData, refetch: refetchAssistance } = useQuery<{ requests: AssistanceRequest[] }>({
+    queryKey: ["/api/admin/assistance-requests"],
+    retry: false,
+  });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      const response = await apiRequest("PATCH", `/api/admin/assistance-requests/${id}`, { status });
+      return response.json();
+    },
+    onSuccess: () => {
+      refetchAssistance();
+      toast({ title: "Status updated" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update status",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const pendingRequests = assistanceData?.requests?.filter(r => r.status === "pending") || [];
 
   const handleTestOnboarding = (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,15 +155,15 @@ export default function AdminDashboard() {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Onboarding Dashboard</h1>
+          <h1 className="text-3xl font-bold text-foreground">Admin Dashboard</h1>
           <p className="text-muted-foreground mt-1">
-            Monitor user onboarding, email automation, and engagement metrics
+            Manage assistance requests, onboarding, and email automation
           </p>
         </div>
         <div className="flex gap-2">
           <Link href="/dashboard/admin/broadcast">
-            <Button 
-              variant="default" 
+            <Button
+              variant="default"
               size="sm"
               data-testid="button-broadcast-email"
             >
@@ -125,9 +171,9 @@ export default function AdminDashboard() {
               Broadcast Email
             </Button>
           </Link>
-          <Button 
-            onClick={() => refetch()} 
-            variant="outline" 
+          <Button
+            onClick={() => { refetch(); refetchAssistance(); }}
+            variant="outline"
             size="sm"
             data-testid="button-refresh-stats"
           >
@@ -136,6 +182,84 @@ export default function AdminDashboard() {
           </Button>
         </div>
       </div>
+
+      <Tabs defaultValue="assistance" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="assistance" className="flex items-center gap-2">
+            <Phone className="h-4 w-4" />
+            Assistance Requests
+            {pendingRequests.length > 0 && (
+              <Badge variant="destructive" className="ml-1 h-5 w-5 p-0 flex items-center justify-center text-xs">
+                {pendingRequests.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="onboarding">
+            <Mail className="h-4 w-4 mr-2" />
+            Onboarding
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="assistance" className="space-y-4">
+          {(!assistanceData?.requests || assistanceData.requests.length === 0) ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                <MessageSquare className="h-12 w-12 text-muted-foreground/30 mb-4" />
+                <p className="text-muted-foreground">No assistance requests yet</p>
+                <p className="text-xs text-muted-foreground mt-1">When users click "Need Help?" during will creation, their requests will appear here.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {assistanceData.requests.map((request) => (
+                <Card key={request.id} className={request.status === "pending" ? "border-primary/30" : ""}>
+                  <CardContent className="pt-6">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-1 flex-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold">{request.name}</h3>
+                          <Badge variant={
+                            request.status === "pending" ? "destructive" :
+                            request.status === "contacted" ? "default" : "secondary"
+                          }>
+                            {request.status}
+                          </Badge>
+                        </div>
+                        <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                          <a href={`mailto:${request.email}`} className="hover:text-foreground">{request.email}</a>
+                          <a href={`tel:${request.phone}`} className="hover:text-foreground flex items-center gap-1">
+                            <Phone className="h-3 w-3" />
+                            {request.phone}
+                          </a>
+                          <span>Stopped at: {stepNames[request.currentStep] || `Step ${request.currentStep}`}</span>
+                          <span>{new Date(request.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                        {request.message && (
+                          <p className="text-sm mt-2 bg-muted/50 p-2 rounded">{request.message}</p>
+                        )}
+                      </div>
+                      <Select
+                        value={request.status}
+                        onValueChange={(value) => updateStatusMutation.mutate({ id: request.id, status: value })}
+                      >
+                        <SelectTrigger className="w-[130px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="contacted">Contacted</SelectItem>
+                          <SelectItem value="resolved">Resolved</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="onboarding" className="space-y-6">
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card>
@@ -338,6 +462,9 @@ export default function AdminDashboard() {
           </div>
         </CardContent>
       </Card>
+
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -255,7 +255,7 @@ export default function LandingPage() {
               <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground pt-2">
                 <span className="flex items-center gap-1.5">
                   <CheckCircle className="w-4 h-4 text-accent" />
-                  Only £49
+                  Only £50
                 </span>
                 <span className="flex items-center gap-1.5">
                   <CheckCircle className="w-4 h-4 text-accent" />
@@ -571,7 +571,7 @@ export default function LandingPage() {
             <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
           <p className="text-sm opacity-60 mt-4">
-            Only £49 - Save progress & Update anytime
+            Only £50 - Save progress & Update anytime
           </p>
         </div>
       </section>

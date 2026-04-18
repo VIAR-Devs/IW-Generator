@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* LIGHT MODE - Modern Black/White with Lime Accent */
+/* LIGHT MODE - Islamic Wills Brand (matching islamicwills.pro) */
 :root {
   --button-outline: rgba(0,0,0, .10);
   --badge-outline: rgba(0,0,0, .05);
@@ -14,72 +14,72 @@
   --elevate-1: rgba(0,0,0, .03);
   --elevate-2: rgba(0,0,0, .08);
 
-  --background: 0 0% 100%;
+  --background: 34 47% 97%;
 
-  --foreground: 220 15% 10%;
+  --foreground: 192 40% 18%;
 
-  --border: 220 10% 90%;
+  --border: 192 15% 88%;
 
-  --card: 0 0% 98%;
+  --card: 34 40% 96%;
 
-  --card-foreground: 220 15% 10%;
+  --card-foreground: 192 40% 18%;
 
-  --card-border: 220 8% 92%;
+  --card-border: 192 12% 90%;
 
-  --sidebar: 0 0% 97%;
+  --sidebar: 34 30% 95%;
 
-  --sidebar-foreground: 220 15% 10%;
+  --sidebar-foreground: 192 40% 18%;
 
-  --sidebar-border: 220 8% 90%;
+  --sidebar-border: 192 12% 88%;
 
-  --sidebar-primary: 220 15% 10%;
+  --sidebar-primary: 117 42% 44%;
 
   --sidebar-primary-foreground: 0 0% 100%;
 
-  --sidebar-accent: 220 10% 93%;
+  --sidebar-accent: 34 40% 92%;
 
-  --sidebar-accent-foreground: 220 15% 15%;
+  --sidebar-accent-foreground: 192 40% 20%;
 
-  --sidebar-ring: 75 80% 50%;
+  --sidebar-ring: 117 42% 44%;
 
   --popover: 0 0% 100%;
 
-  --popover-foreground: 220 15% 10%;
+  --popover-foreground: 192 40% 18%;
 
-  --popover-border: 220 10% 90%;
+  --popover-border: 192 15% 88%;
 
-  --primary: 220 15% 10%;
+  --primary: 117 42% 44%;
 
   --primary-foreground: 0 0% 100%;
 
-  --secondary: 220 8% 93%;
+  --secondary: 34 30% 92%;
 
-  --secondary-foreground: 220 15% 15%;
+  --secondary-foreground: 192 40% 20%;
 
-  --muted: 220 10% 95%;
+  --muted: 34 25% 94%;
 
-  --muted-foreground: 220 10% 45%;
+  --muted-foreground: 192 15% 45%;
 
-  --accent: 75 80% 55%;
+  --accent: 117 42% 44%;
 
-  --accent-foreground: 220 15% 10%;
+  --accent-foreground: 0 0% 100%;
 
-  --destructive: 0 72% 51%;
+  --destructive: 14 89% 58%;
 
   --destructive-foreground: 0 0% 98%;
 
-  --input: 220 15% 80%;
-  --ring: 75 80% 50%;
-  --chart-1: 75 80% 50%;
-  --chart-2: 142 76% 36%;
+  --input: 192 10% 82%;
+  --ring: 117 42% 44%;
+  --chart-1: 117 42% 44%;
+  --chart-2: 14 89% 58%;
   --chart-3: 210 100% 50%;
   --chart-4: 45 80% 45%;
   --chart-5: 38 92% 50%;
 
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-serif: Georgia, serif;
+  --font-sans: 'Source Sans Pro', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-serif: 'PT Serif', Georgia, serif;
   --font-mono: Menlo, monospace;
-  --radius: .5rem;
+  --radius: .75rem;
   --shadow-2xs: 0px 1px 2px 0px hsl(220 15% 15% / 0.05);
   --shadow-xs: 0px 1px 3px 0px hsl(220 15% 15% / 0.10);
   --shadow-sm: 0px 2px 4px -1px hsl(220 15% 15% / 0.06), 0px 1px 2px -1px hsl(220 15% 15% / 0.10);
@@ -132,64 +132,64 @@
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
 
-  --background: 220 15% 8%;
+  --background: 192 30% 8%;
 
   --foreground: 0 0% 95%;
 
-  --border: 220 12% 18%;
+  --border: 192 15% 18%;
 
-  --card: 220 14% 12%;
+  --card: 192 20% 12%;
 
   --card-foreground: 0 0% 95%;
 
-  --card-border: 220 12% 16%;
+  --card-border: 192 15% 16%;
 
-  --sidebar: 220 14% 10%;
+  --sidebar: 192 20% 10%;
 
   --sidebar-foreground: 0 0% 95%;
 
-  --sidebar-border: 220 12% 16%;
+  --sidebar-border: 192 15% 16%;
 
-  --sidebar-primary: 0 0% 95%;
+  --sidebar-primary: 117 42% 50%;
 
-  --sidebar-primary-foreground: 220 15% 8%;
+  --sidebar-primary-foreground: 0 0% 100%;
 
-  --sidebar-accent: 220 12% 18%;
+  --sidebar-accent: 192 15% 18%;
 
   --sidebar-accent-foreground: 0 0% 90%;
 
-  --sidebar-ring: 75 80% 55%;
+  --sidebar-ring: 117 42% 50%;
 
-  --popover: 220 14% 12%;
+  --popover: 192 20% 12%;
 
   --popover-foreground: 0 0% 95%;
 
-  --popover-border: 220 12% 18%;
+  --popover-border: 192 15% 18%;
 
-  --primary: 0 0% 95%;
+  --primary: 117 42% 50%;
 
-  --primary-foreground: 220 15% 8%;
+  --primary-foreground: 0 0% 100%;
 
-  --secondary: 220 12% 18%;
+  --secondary: 192 15% 18%;
 
   --secondary-foreground: 0 0% 90%;
 
-  --muted: 220 12% 16%;
+  --muted: 192 15% 16%;
 
-  --muted-foreground: 220 8% 60%;
+  --muted-foreground: 192 10% 60%;
 
-  --accent: 75 80% 55%;
+  --accent: 117 42% 50%;
 
-  --accent-foreground: 220 15% 8%;
+  --accent-foreground: 0 0% 100%;
 
-  --destructive: 0 72% 51%;
+  --destructive: 14 89% 58%;
 
   --destructive-foreground: 0 0% 98%;
 
-  --input: 220 12% 25%;
-  --ring: 75 80% 55%;
-  --chart-1: 75 80% 60%;
-  --chart-2: 142 76% 56%;
+  --input: 192 15% 25%;
+  --ring: 117 42% 50%;
+  --chart-1: 117 42% 55%;
+  --chart-2: 14 89% 62%;
   --chart-3: 210 100% 70%;
   --chart-4: 45 80% 65%;
   --chart-5: 38 92% 70%;
