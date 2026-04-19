@@ -4,8 +4,10 @@ import passport from "passport";
 import bcrypt from "bcryptjs";
 import { storage } from "./storage";
 import { z } from "zod";
-import { willFormDataSchema } from "@shared/schema";
+import { willFormDataSchema, users, emailEvents, conversationSessions, gapsAnalysis } from "@shared/schema";
 import type { User as DbUser } from "@shared/schema";
+import { db } from "./db";
+import { desc, count, eq, gte, sql as drizzleSql } from "drizzle-orm";
 import { triggerOnboardingFlow, getOnboardingStats, sendWelcomeEmail, sendBroadcastEmails } from "./services/onboarding";
 import { stripeService } from "./stripeService";
 import { getStripePublishableKey } from "./stripeClient";
@@ -462,6 +464,125 @@ export async function registerRoutes(app: Express): Promise<Server> {
       next(error);
     }
   });
+
+  // ─── Phase 1 admin endpoints (iw-025) ────────────────────────────────────
+
+  // GET /api/admin/engagement-stats — aggregate email engagement metrics
+  app.get("/api/admin/engagement-stats", requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+      // All-time counts by event_type
+      const allTimeByType = await db
+        .select({ eventType: emailEvents.eventType, n: count() })
+        .from(emailEvents)
+        .groupBy(emailEvents.eventType);
+
+      // Last-30-days counts by event_type
+      const last30ByType = await db
+        .select({ eventType: emailEvents.eventType, n: count() })
+        .from(emailEvents)
+        .where(gte(emailEvents.occurredAt, thirtyDaysAgo))
+        .groupBy(emailEvents.eventType);
+
+      // Per-template breakdown (using metadata.template_key). We pull the raw rows
+      // and aggregate in JS — simpler than jsonb group-by for v1 volumes.
+      const recentRows = await db
+        .select({
+          eventType: emailEvents.eventType,
+          metadata: emailEvents.metadata,
+        })
+        .from(emailEvents)
+        .where(gte(emailEvents.occurredAt, thirtyDaysAgo))
+        .limit(10000);
+
+      const perTemplate: Record<string, Record<string, number>> = {};
+      for (const row of recentRows) {
+        const tk = (row.metadata as any)?.template_key as string | undefined;
+        if (!tk) continue;
+        if (!perTemplate[tk]) perTemplate[tk] = {};
+        perTemplate[tk][row.eventType] = (perTemplate[tk][row.eventType] ?? 0) + 1;
+      }
+
+      // User-side engagement summary
+      const [userEngagement] = await db
+        .select({
+          totalUsers: count(),
+          totalOpens: drizzleSql<number>`COALESCE(SUM(${users.openCount}), 0)`,
+          totalClicks: drizzleSql<number>`COALESCE(SUM(${users.clickCount}), 0)`,
+          bounced: drizzleSql<number>`COUNT(CASE WHEN ${users.bounceStatus} IS NOT NULL THEN 1 END)`,
+          unsubscribed: drizzleSql<number>`COUNT(CASE WHEN ${users.unsubscribedAt} IS NOT NULL THEN 1 END)`,
+        })
+        .from(users);
+
+      res.json({
+        allTime: Object.fromEntries(allTimeByType.map((r) => [r.eventType, Number(r.n)])),
+        last30Days: Object.fromEntries(last30ByType.map((r) => [r.eventType, Number(r.n)])),
+        perTemplate,
+        userEngagement,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // GET /api/admin/conversation-sessions — recent conversation sessions
+  app.get("/api/admin/conversation-sessions", requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const limit = Math.min(parseInt(String(req.query.limit ?? "50"), 10) || 50, 200);
+
+      const rows = await db
+        .select({
+          id: conversationSessions.id,
+          userId: conversationSessions.userId,
+          sessionToken: conversationSessions.sessionToken,
+          journeyType: conversationSessions.journeyType,
+          currentBeat: conversationSessions.currentBeat,
+          beatsCompleted: conversationSessions.beatsCompleted,
+          startedAt: conversationSessions.startedAt,
+          lastActivityAt: conversationSessions.lastActivityAt,
+          completedAt: conversationSessions.completedAt,
+          abandonedAt: conversationSessions.abandonedAt,
+          recoveredAt: conversationSessions.recoveredAt,
+        })
+        .from(conversationSessions)
+        .orderBy(desc(conversationSessions.lastActivityAt))
+        .limit(limit);
+
+      res.json({ sessions: rows });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // GET /api/admin/gaps-analysis — recent gap analyses with counts
+  app.get("/api/admin/gaps-analysis", requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const limit = Math.min(parseInt(String(req.query.limit ?? "50"), 10) || 50, 200);
+
+      const rows = await db
+        .select()
+        .from(gapsAnalysis)
+        .orderBy(desc(gapsAnalysis.generatedAt))
+        .limit(limit);
+
+      // Aggregate counts by gap_type across the returned window
+      const byGapType: Record<string, number> = {};
+      const byRoute: Record<string, number> = {};
+      for (const row of rows) {
+        for (const g of (row.gaps || [])) {
+          byGapType[g.gap_type] = (byGapType[g.gap_type] ?? 0) + 1;
+          byRoute[g.recommended_route] = (byRoute[g.recommended_route] ?? 0) + 1;
+        }
+      }
+
+      res.json({ analyses: rows, summary: { byGapType, byRoute, count: rows.length } });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // ─── end Phase 1 admin endpoints ─────────────────────────────────────────
 
   // Stripe Payment Routes
 
