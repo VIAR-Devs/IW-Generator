@@ -86,6 +86,45 @@ app.post(
   }
 );
 
+// CRITICAL: Register Resend webhook route BEFORE express.json()
+// Resend signs payloads via Svix; signature verification needs the raw body.
+app.post(
+  '/api/resend/webhook',
+  express.raw({ type: 'application/json' }),
+  async (req, res) => {
+    const secret = process.env.RESEND_WEBHOOK_SECRET;
+    if (!secret) {
+      console.error('RESEND WEBHOOK ERROR: RESEND_WEBHOOK_SECRET not set');
+      return res.status(500).json({ error: 'Webhook not configured' });
+    }
+
+    if (!Buffer.isBuffer(req.body)) {
+      console.error('RESEND WEBHOOK ERROR: req.body is not a Buffer');
+      return res.status(500).json({ error: 'Webhook processing error' });
+    }
+
+    try {
+      const { verifyResendWebhook, persistResendEvent } = await import('./services/email-events');
+
+      const event = verifyResendWebhook(
+        req.body as Buffer,
+        {
+          'svix-id': req.headers['svix-id'],
+          'svix-timestamp': req.headers['svix-timestamp'],
+          'svix-signature': req.headers['svix-signature'],
+        } as any,
+        secret,
+      );
+
+      await persistResendEvent(event);
+      res.status(200).json({ received: true });
+    } catch (error: any) {
+      console.error('Resend webhook error:', error.message);
+      res.status(400).json({ error: 'Webhook verification or processing failed' });
+    }
+  }
+);
+
 // Now apply JSON middleware for all other routes
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
