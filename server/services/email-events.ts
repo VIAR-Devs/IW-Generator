@@ -27,6 +27,41 @@ export interface ResendWebhookEvent {
 }
 
 /**
+ * Log an outbound send immediately (before the webhook delivery/open events arrive).
+ * Call this right after a successful Resend client.emails.send() so the funnel starts
+ * from "sent" rather than the first inbound Resend event.
+ *
+ * Fire-and-forget. Failures are logged but do not throw — we must not break the
+ * caller's send flow because of telemetry issues.
+ */
+export async function logSentEmail(args: {
+  userId?: number | null;
+  messageId?: string | null;
+  subject?: string | null;
+  recipientEmail: string;
+  templateKey?: string;
+  metadata?: Record<string, unknown>;
+}): Promise<void> {
+  try {
+    const payload: InsertEmailEvent = {
+      userId: args.userId ?? null,
+      messageId: args.messageId ?? null,
+      eventType: "sent",
+      subject: args.subject ?? null,
+      recipientEmail: args.recipientEmail,
+      metadata: {
+        template_key: args.templateKey,
+        source: "outbound_send",
+        ...(args.metadata || {}),
+      },
+    };
+    await db.insert(emailEvents).values(payload);
+  } catch (err: any) {
+    console.error(`[email-events] logSentEmail failed for ${args.recipientEmail}: ${err?.message}`);
+  }
+}
+
+/**
  * Verify a Resend webhook payload signature using Svix.
  * Returns the parsed event on success, throws on failure.
  *

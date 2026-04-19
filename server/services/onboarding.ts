@@ -1,4 +1,5 @@
 import { getUncachableResendClient } from './resend-client';
+import { logSentEmail } from './email-events';
 import { getWelcomeEmailHtml, getWelcomeEmailText } from '../templates/welcome-email';
 import { getFollowUpEmailHtml, getFollowUpEmailText } from '../templates/follow-up-email';
 import { getBroadcastEmailHtml, getBroadcastEmailText } from '../templates/broadcast-email';
@@ -34,10 +35,11 @@ export async function sendWelcomeEmail(
   try {
     const { client, fromEmail } = await getUncachableResendClient();
     
+    const welcomeSubject = 'Welcome to Islamic Wills - Complete Your Will in 10 Minutes';
     const result = await client.emails.send({
       from: fromEmail,
       to: email,
-      subject: 'Welcome to Islamic Wills - Complete Your Will in 10 Minutes',
+      subject: welcomeSubject,
       html: getWelcomeEmailHtml(fullName),
       text: getWelcomeEmailText(fullName),
     });
@@ -45,6 +47,13 @@ export async function sendWelcomeEmail(
     if (result.error) {
       throw new Error(result.error.message);
     }
+
+    await logSentEmail({
+      messageId: result.data?.id ?? null,
+      subject: welcomeSubject,
+      recipientEmail: email,
+      templateKey: 'welcome',
+    });
 
     emailStats.welcomeEmailsSent++;
     console.log(`Welcome email sent successfully to ${email}`);
@@ -72,10 +81,11 @@ export async function sendFollowUpEmail(
   try {
     const { client, fromEmail } = await getUncachableResendClient();
     
+    const followUpSubject = 'Ready to Complete Your Islamic Will?';
     const result = await client.emails.send({
       from: fromEmail,
       to: email,
-      subject: 'Ready to Complete Your Islamic Will?',
+      subject: followUpSubject,
       html: getFollowUpEmailHtml(fullName),
       text: getFollowUpEmailText(fullName),
     });
@@ -83,6 +93,13 @@ export async function sendFollowUpEmail(
     if (result.error) {
       throw new Error(result.error.message);
     }
+
+    await logSentEmail({
+      messageId: result.data?.id ?? null,
+      subject: followUpSubject,
+      recipientEmail: email,
+      templateKey: 'follow_up',
+    });
 
     emailStats.followUpEmailsSent++;
     console.log(`Follow-up email sent successfully to ${email}`);
@@ -294,11 +311,20 @@ export async function sendBroadcastEmails(
             html: getBroadcastEmailHtml(subject, message, user.fullName),
             text: getBroadcastEmailText(subject, message, user.fullName),
           });
-          
+
           if (result.error) {
             throw new Error(result.error.message);
           }
-          
+
+          await logSentEmail({
+            userId: user.id,
+            messageId: result.data?.id ?? null,
+            subject,
+            recipientEmail: user.email,
+            templateKey: 'broadcast',
+            metadata: { filter: userFilter },
+          });
+
           totalSent++;
           return { success: true, email: user.email };
         } catch (error: any) {
