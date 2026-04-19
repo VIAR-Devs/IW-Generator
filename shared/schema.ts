@@ -140,12 +140,24 @@ export const users = pgTable("users", {
   signupSource: varchar("signup_source", { length: 50 }),
   onboardingStatus: varchar("onboarding_status", { length: 50 }).default("pending"),
   onboardingStartedAt: timestamp("onboarding_started_at"),
+  // Engagement tracking (Phase 1 — populated by Resend event webhook)
+  lastOpenedAt: timestamp("last_opened_at"),
+  lastClickedAt: timestamp("last_clicked_at"),
+  openCount: integer("open_count").default(0),
+  clickCount: integer("click_count").default(0),
+  bounceStatus: varchar("bounce_status", { length: 50 }), // null | soft | hard | complaint
+  unsubscribedAt: timestamp("unsubscribed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ many, one }) => ({
   wills: many(wills),
+  userContext: one(userContext),
+  consents: many(consents),
+  emailEvents: many(emailEvents),
+  conversationSessions: many(conversationSessions),
+  gapsAnalysis: many(gapsAnalysis),
 }));
 
 export type User = typeof users.$inferSelect;
@@ -228,3 +240,151 @@ export const insertAssistanceRequestSchema = createInsertSchema(assistanceReques
   createdAt: true,
 });
 export type InsertAssistanceRequest = z.infer<typeof insertAssistanceRequestSchema>;
+
+// ──────────────────────────────────────────────────────────────────────────
+// Phase 1 Foundations (iw-025) — conversational rebuild prerequisites
+// Spec: 00_foundation/specs/iw-generator-conversational-spec-v1.md
+// ──────────────────────────────────────────────────────────────────────────
+
+// Consents Table — three-way consent model per data policy template
+// (service_delivery, ecosystem_matching, marketing)
+export const consents = pgTable("consents", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  consentType: varchar("consent_type", { length: 50 }).notNull(), // 'service_delivery' | 'ecosystem_matching' | 'marketing'
+  granted: integer("granted").notNull().default(0), // 0/1 bool
+  grantedAt: timestamp("granted_at"),
+  withdrawnAt: timestamp("withdrawn_at"),
+  policyVersion: varchar("policy_version", { length: 20 }),
+  method: varchar("method", { length: 50 }), // 'checkbox' | 'api' | 'email_unsubscribe' | 'admin'
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const consentsRelations = relations(consents, ({ one }) => ({
+  user: one(users, { fields: [consents.userId], references: [users.id] }),
+}));
+
+export type Consent = typeof consents.$inferSelect;
+export const insertConsentSchema = createInsertSchema(consents).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertConsent = z.infer<typeof insertConsentSchema>;
+
+// User Context Table — captured beyond-the-will data used for ecosystem routing
+// + gap analysis. One row per user.
+export const userContext = pgTable("user_context", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().unique().references(() => users.id),
+  estateSizeBand: varchar("estate_size_band", { length: 20 }), // 'under-100k' | '100-500k' | '500k-1m' | '1m-plus' | 'prefer-not-say'
+  hasBusinessOwnership: integer("has_business_ownership"), // 0/1 nullable
+  overseasAssets: integer("overseas_assets"), // 0/1 nullable
+  overseasJurisdictions: jsonb("overseas_jurisdictions").$type<string[]>(),
+  migrationIntent: varchar("migration_intent", { length: 30 }), // 'none' | 'considering' | 'actively-planning' | 'already-moved'
+  migrationDestination: text("migration_destination"),
+  givingIntentLevel: varchar("giving_intent_level", { length: 20 }), // 'none' | 'occasional' | 'regular' | 'substantial'
+  preferredCauses: jsonb("preferred_causes").$type<string[]>(), // ['water', 'orphans', 'education', 'health', 'dawah', 'local-masjid', 'other']
+  ageBand: varchar("age_band", { length: 20 }),
+  cityBand: varchar("city_band", { length: 100 }),
+  referrerSource: varchar("referrer_source", { length: 50 }), // 'organic' | 'ad' | 'signature-project' | 'middle-way' | 'direct'
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const userContextRelations = relations(userContext, ({ one }) => ({
+  user: one(users, { fields: [userContext.userId], references: [users.id] }),
+}));
+
+export type UserContext = typeof userContext.$inferSelect;
+export const insertUserContextSchema = createInsertSchema(userContext).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertUserContext = z.infer<typeof insertUserContextSchema>;
+
+// Email Events Table — time-series log of Resend webhook events
+// Keyed to user (when known) or recipient_email (when anonymous)
+export const emailEvents = pgTable("email_events", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id), // nullable — events may arrive before user is created
+  messageId: varchar("message_id", { length: 255 }),
+  eventType: varchar("event_type", { length: 50 }).notNull(), // 'sent' | 'delivered' | 'opened' | 'clicked' | 'bounced' | 'complained' | 'unsubscribed'
+  subject: text("subject"),
+  recipientEmail: varchar("recipient_email", { length: 255 }),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+  occurredAt: timestamp("occurred_at").defaultNow().notNull(),
+});
+
+export const emailEventsRelations = relations(emailEvents, ({ one }) => ({
+  user: one(users, { fields: [emailEvents.userId], references: [users.id] }),
+}));
+
+export type EmailEvent = typeof emailEvents.$inferSelect;
+export const insertEmailEventSchema = createInsertSchema(emailEvents).omit({
+  id: true,
+  occurredAt: true,
+});
+export type InsertEmailEvent = z.infer<typeof insertEmailEventSchema>;
+
+// Conversation Sessions Table — one row per conversational session
+// Pre-user-creation sessions keyed by session_token; linked to user once email is captured
+export const conversationSessions = pgTable("conversation_sessions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id), // nullable until email captured at beat ~3
+  sessionToken: varchar("session_token", { length: 64 }).notNull().unique(),
+  journeyType: varchar("journey_type", { length: 30 }), // 'self-serve' | 'assisted' | 'abandoned-recovered' | 'complex'
+  currentBeat: varchar("current_beat", { length: 50 }),
+  beatsCompleted: jsonb("beats_completed").$type<string[]>(),
+  messages: jsonb("messages").$type<Array<{ role: "user" | "assistant"; content: string; timestamp: string }>>(),
+  contextSnapshot: jsonb("context_snapshot").$type<Record<string, unknown>>(), // latest AI layer context for resume
+  abandonedAt: timestamp("abandoned_at"),
+  recoveredAt: timestamp("recovered_at"),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+  lastActivityAt: timestamp("last_activity_at").defaultNow().notNull(),
+});
+
+export const conversationSessionsRelations = relations(conversationSessions, ({ one }) => ({
+  user: one(users, { fields: [conversationSessions.userId], references: [users.id] }),
+}));
+
+export type ConversationSession = typeof conversationSessions.$inferSelect;
+export const insertConversationSessionSchema = createInsertSchema(conversationSessions).omit({
+  id: true,
+  startedAt: true,
+  lastActivityAt: true,
+});
+export type InsertConversationSession = z.infer<typeof insertConversationSessionSchema>;
+
+// Gaps Analysis Table — one row per will issuance. Holds the personalised gap list
+// surfaced at the payment/report moment + CTA click telemetry.
+export const gapsAnalysis = pgTable("gaps_analysis", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  willId: integer("will_id").references(() => wills.id),
+  generatedAt: timestamp("generated_at").defaultNow().notNull(),
+  gaps: jsonb("gaps").$type<Array<{
+    gap_type: string; // 'trust' | 'lpa' | 'iht' | 'cross_jurisdiction' | 'probate' | 'gift_strategy' | 'sadaqah_jariyah' | 'ongoing_review'
+    severity: "low" | "medium" | "high";
+    recommended_route: string; // 'tabs' | 'hadleys' | 'sdqa-signature' | 'middle-way' | 'khatmah' | 'self-serve-review'
+    reasoning: string;
+  }>>().notNull(),
+  surfacedToUser: integer("surfaced_to_user").default(0),
+  surfacedAt: timestamp("surfaced_at"),
+  ctaClicks: jsonb("cta_clicks").$type<Array<{ gap_type: string; cta: string; clicked_at: string }>>(),
+});
+
+export const gapsAnalysisRelations = relations(gapsAnalysis, ({ one }) => ({
+  user: one(users, { fields: [gapsAnalysis.userId], references: [users.id] }),
+  will: one(wills, { fields: [gapsAnalysis.willId], references: [wills.id] }),
+}));
+
+export type GapsAnalysis = typeof gapsAnalysis.$inferSelect;
+export const insertGapsAnalysisSchema = createInsertSchema(gapsAnalysis).omit({
+  id: true,
+  generatedAt: true,
+});
+export type InsertGapsAnalysis = z.infer<typeof insertGapsAnalysisSchema>;
