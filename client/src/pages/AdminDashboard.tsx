@@ -198,6 +198,10 @@ export default function AdminDashboard() {
             <Mail className="h-4 w-4 mr-2" />
             Onboarding
           </TabsTrigger>
+          <TabsTrigger value="engagement">
+            <Mail className="h-4 w-4 mr-2" />
+            Engagement
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="assistance" className="space-y-4">
@@ -464,7 +468,110 @@ export default function AdminDashboard() {
       </Card>
 
         </TabsContent>
+
+        <TabsContent value="engagement" className="space-y-4">
+          <EngagementPanel />
+        </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+// ─── Engagement Panel (Phase 1 iw-025) ────────────────────────────────────
+
+interface EngagementStats {
+  allTime: Record<string, number>;
+  last30Days: Record<string, number>;
+  perTemplate: Record<string, Record<string, number>>;
+  userEngagement: {
+    totalUsers: number;
+    totalOpens: number;
+    totalClicks: number;
+    bounced: number;
+    unsubscribed: number;
+  };
+}
+
+function EngagementPanel() {
+  const { data, isLoading, error } = useQuery<EngagementStats>({
+    queryKey: ["/api/admin/engagement-stats"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/engagement-stats", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load engagement stats");
+      return res.json();
+    },
+  });
+
+  if (isLoading) return <Card><CardContent className="p-6">Loading engagement data...</CardContent></Card>;
+  if (error) return <Card><CardContent className="p-6 text-destructive">Error: {(error as Error).message}</CardContent></Card>;
+  if (!data) return null;
+
+  const sent30 = data.last30Days.sent || 0;
+  const openRate30 = sent30 ? ((data.last30Days.opened || 0) / sent30) * 100 : 0;
+  const clickRate30 = sent30 ? ((data.last30Days.clicked || 0) / sent30) * 100 : 0;
+  const bounceRate30 = sent30 ? ((data.last30Days.bounced || 0) / sent30) * 100 : 0;
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Last 30 days — email funnel</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
+            {["sent", "delivered", "opened", "clicked", "bounced", "unsubscribed"].map((k) => (
+              <div key={k} className="rounded-md border p-3">
+                <div className="text-xs uppercase text-muted-foreground">{k}</div>
+                <div className="text-xl font-semibold">{data.last30Days[k] ?? 0}</div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
+            <div><span className="text-muted-foreground">Open rate: </span><strong>{openRate30.toFixed(1)}%</strong></div>
+            <div><span className="text-muted-foreground">Click rate: </span><strong>{clickRate30.toFixed(1)}%</strong></div>
+            <div><span className="text-muted-foreground">Bounce rate: </span><strong>{bounceRate30.toFixed(1)}%</strong></div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Per template — last 30 days</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {Object.keys(data.perTemplate).length === 0 ? (
+            <p className="text-sm text-muted-foreground">No template-tagged sends in window yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {Object.entries(data.perTemplate).map(([tk, counts]) => (
+                <div key={tk} className="flex items-center gap-4 text-sm">
+                  <div className="w-24 font-medium">{tk}</div>
+                  {["sent", "delivered", "opened", "clicked", "bounced"].map((k) => (
+                    <div key={k} className="text-muted-foreground">
+                      {k}: <strong className="text-foreground">{counts[k] ?? 0}</strong>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>User-side engagement</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+            <div><div className="text-xs uppercase text-muted-foreground">Users</div><div className="text-xl font-semibold">{data.userEngagement.totalUsers}</div></div>
+            <div><div className="text-xs uppercase text-muted-foreground">Total opens</div><div className="text-xl font-semibold">{data.userEngagement.totalOpens}</div></div>
+            <div><div className="text-xs uppercase text-muted-foreground">Total clicks</div><div className="text-xl font-semibold">{data.userEngagement.totalClicks}</div></div>
+            <div><div className="text-xs uppercase text-muted-foreground">Bounced</div><div className="text-xl font-semibold">{data.userEngagement.bounced}</div></div>
+            <div><div className="text-xs uppercase text-muted-foreground">Unsubscribed</div><div className="text-xl font-semibold">{data.userEngagement.unsubscribed}</div></div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
