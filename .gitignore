@@ -4,3 +4,37 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+# Env files - NEVER commit
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+
+# Replit local cache (machine-specific)
+.local/
+.replit.local
+
+# Local Sentry
+.sentryclirc
+
+# Test coverage
+coverage/
+.nyc_output/
+*.lcov
+
+# Build / log artefacts
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+
+# OS
+Thumbs.db
