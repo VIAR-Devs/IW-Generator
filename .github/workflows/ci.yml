@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  lint-typecheck-build-test:
+    name: Lint + Typecheck + Build + Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run check
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        env:
+          # Build needs env access; the real values are not needed for a typecheck-style build.
+          # Vite reads VITE_* vars at build time; backend bundle does not need DB at build time.
+          NODE_ENV: production
+        run: npm run build
