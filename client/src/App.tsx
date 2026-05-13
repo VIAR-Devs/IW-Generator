@@ -14,6 +14,8 @@ import AdminDashboard from "@/pages/AdminDashboard";
 import AdminBroadcast from "@/pages/AdminBroadcast";
 import Contact from "@/pages/Contact";
 import ThankYou from "@/pages/ThankYou";
+import Privacy from "@/pages/Privacy";
+import Terms from "@/pages/Terms";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -23,6 +25,8 @@ function Router() {
       <Route path="/one-nation" component={OneNation} />
       <Route path="/contact" component={Contact} />
       <Route path="/thank-you" component={ThankYou} />
+      <Route path="/privacy" component={Privacy} />
+      <Route path="/terms" component={Terms} />
       <Route path="/my-details" component={CreateWill} />
       <Route path="/dashboard/admin/broadcast">
         <ProtectedRoute>
