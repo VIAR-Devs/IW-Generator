@@ -182,6 +182,28 @@ export const insertWillSchema = createInsertSchema(wills).omit({
 });
 export type InsertWill = z.infer<typeof insertWillSchema>;
 
+// Admin Audit Log Table — records every admin-bypass action against PII tables.
+// Required by Charter Item 4 ("admin bypass logged in audit table"). Inserted by
+// requireAdmin middleware before the handler runs; never deleted in normal ops.
+export const adminAuditLog = pgTable("admin_audit_log", {
+  id: serial("id").primaryKey(),
+  adminEmail: varchar("admin_email", { length: 255 }).notNull(),
+  adminUserId: integer("admin_user_id").references(() => users.id),
+  action: varchar("action", { length: 100 }).notNull(),
+  route: varchar("route", { length: 255 }),
+  targetUserId: integer("target_user_id"),
+  metadata: jsonb("metadata"),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type AdminAuditLog = typeof adminAuditLog.$inferSelect;
+export const insertAdminAuditLogSchema = createInsertSchema(adminAuditLog).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertAdminAuditLog = z.infer<typeof insertAdminAuditLogSchema>;
+
 // Scheduled Jobs Table (for persistent follow-up emails)
 export const scheduledJobs = pgTable("scheduled_jobs", {
   id: serial("id").primaryKey(),

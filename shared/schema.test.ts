@@ -14,6 +14,7 @@ import {
   childSchema,
   funeralPreferencesSchema,
   wasiyyahBeneficiarySchema,
+  insertAdminAuditLogSchema,
 } from "./schema";
 
 describe("basicDetailsSchema", () => {
@@ -120,6 +121,39 @@ describe("funeralPreferencesSchema", () => {
       charityAtFuneral: "SDQA",
     };
     expect(() => funeralPreferencesSchema.parse(valid)).not.toThrow();
+  });
+});
+
+describe("insertAdminAuditLogSchema", () => {
+  it("accepts a minimal admin audit log row", () => {
+    const valid = {
+      adminEmail: "irfan@gardenproject.pro",
+      action: "GET /api/admin/onboarding-stats",
+    };
+    expect(() => insertAdminAuditLogSchema.parse(valid)).not.toThrow();
+  });
+
+  it("accepts the full admin audit log shape", () => {
+    const valid = {
+      adminEmail: "irfan@gardenproject.pro",
+      adminUserId: 1,
+      action: "POST /api/admin/broadcast-email",
+      route: "/api/admin/broadcast-email",
+      targetUserId: 42,
+      metadata: { subject: "Test broadcast" },
+      ipAddress: "203.0.113.42",
+    };
+    expect(() => insertAdminAuditLogSchema.parse(valid)).not.toThrow();
+  });
+
+  it("rejects rows missing the admin email", () => {
+    const invalid = { action: "GET /api/admin/onboarding-stats" };
+    expect(() => insertAdminAuditLogSchema.parse(invalid)).toThrow();
+  });
+
+  it("rejects rows missing the action", () => {
+    const invalid = { adminEmail: "irfan@gardenproject.pro" };
+    expect(() => insertAdminAuditLogSchema.parse(invalid)).toThrow();
   });
 });
 
