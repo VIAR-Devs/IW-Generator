@@ -131,6 +131,11 @@ export type WillFormData = z.infer<typeof willFormDataSchema>;
 // Database Tables - referenced from blueprint:javascript_database
 
 // Users Table
+//
+// gdprConsentAt + gdprConsentVersion record the consent moment required
+// by Charter Item 5. A null timestamp means the user has not yet consented
+// under the current policy version. The version string lets us re-prompt
+// when the policy materially changes.
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   email: varchar("email", { length: 255 }).notNull().unique(),
@@ -140,6 +145,8 @@ export const users = pgTable("users", {
   signupSource: varchar("signup_source", { length: 50 }),
   onboardingStatus: varchar("onboarding_status", { length: 50 }).default("pending"),
   onboardingStartedAt: timestamp("onboarding_started_at"),
+  gdprConsentAt: timestamp("gdpr_consent_at"),
+  gdprConsentVersion: varchar("gdpr_consent_version", { length: 20 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
