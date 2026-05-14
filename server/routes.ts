@@ -148,10 +148,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!req.user) {
       return res.status(401).json({ message: "Not authenticated" });
     }
-    
+
     // Return user without password
     const { passwordHash: _, ...userWithoutPassword } = req.user;
     res.json({ user: userWithoutPassword });
+  });
+
+  // POST /api/auth/consent - Record the current user's GDPR consent
+  // Charter Item 5: every paying user must give explicit consent before
+  // payment is taken. The privacy policy version is captured so a future
+  // material change can re-prompt only the users who haven't yet agreed.
+  app.post("/api/auth/consent", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { version } = z.object({
+        version: z.string().min(1).max(20),
+      }).parse(req.body);
+
+      const updated = await storage.recordConsent(req.user.id, version);
+      if (!updated) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const { passwordHash: _, ...userWithoutPassword } = updated;
+      res.json({ user: userWithoutPassword });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      next(error);
+    }
   });
 
   // Will routes
