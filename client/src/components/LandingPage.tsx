@@ -599,6 +599,9 @@ export default function LandingPage() {
               <a href="/privacy" className="text-sm text-muted-foreground hover:text-foreground transition-colors" data-testid="link-privacy">
                 Privacy
               </a>
+              <a href="/terms" className="text-sm text-muted-foreground hover:text-foreground transition-colors" data-testid="link-terms">
+                Terms
+              </a>
               <a href="/contact" className="text-sm text-muted-foreground hover:text-foreground transition-colors" data-testid="link-contact">
                 Contact
               </a>
