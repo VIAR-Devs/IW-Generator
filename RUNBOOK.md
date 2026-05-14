@@ -2,7 +2,7 @@
 
 Operational procedures: deploy, rollback, incident response, data restoration, common issues.
 
-Last reviewed: 2026-05-13 (Charter pre-flight Item 7).
+Last reviewed: 2026-05-14 (RLS role-swap section added alongside Charter Items 4 + 5 close).
 
 ## Deploy
 
@@ -94,6 +94,24 @@ Fix:
 2. Re-run the deterministic Faraid calculator with the same input.
 3. If output differs, there's a bug — escalate to Tabs / Mariam / BLJ for solicitor review BEFORE talking to user.
 4. Faraid is deterministic and unit-tested; this should never happen in practice.
+
+## RLS role swap (one-time, before first paid traffic)
+
+`migrations/0001_enable_rls.sql` creates an `app_user` role with no BYPASSRLS and enables FORCE ROW LEVEL SECURITY on the four PII tables. Until the production `DATABASE_URL` connects as `app_user`, the existing owner-role connection still bypasses every policy. Do the swap before the first paid traffic lands.
+
+1. Apply the migration if you haven't already: `npm run db:push` (creates `admin_audit_log` and the GDPR consent columns on `users`), then `tsx scripts/run-sql-migrations.ts` (enables RLS + creates the `app_user` role + policies).
+2. In the Neon dashboard, open the IW Generator project → Roles → `app_user`. Reset / set the password and copy the connection string (it starts `postgresql://app_user:...`).
+3. In Replit Secrets (v1) or the Vercel env panel (Phase 2), update `DATABASE_URL` to the new connection string. Keep the old owner-role string in a safe place for rollback.
+4. Redeploy. Hit the live URL and run through one will draft end-to-end while signed in. Check Replit logs (or Sentry once wired) for `permission denied for table` — that means a query is running outside `withUserContext()` and needs refactoring.
+5. Positive proof: connect as `app_user` from the Neon SQL editor (no session variables set) and run `SELECT * FROM users LIMIT 1`. Expected: zero rows. Rows coming back means the role inherited BYPASSRLS from a parent role — fix at the Neon role level before continuing.
+
+Rollback: switch `DATABASE_URL` back to the owner-role connection string and redeploy. The migration leaves the policies in place; they just stop enforcing while the bypass role is in use.
+
+See `docs/adr/0003-rls-and-row-access.md` for the full model.
+
+## Privacy policy version bump
+
+`PaymentStep.tsx` ships a `PRIVACY_POLICY_VERSION` constant. When `docs/data-policy.md` changes materially (new vendor, new processing purpose, retention shift) bump it. Existing users will get a re-prompt on their next visit to the payment step — their stored `gdpr_consent_version` no longer matches the current one, so the checkbox unticks. The `/privacy` and `/terms` routes render from the policy doc; keep them in lockstep.
 
 ## On-call (post-launch)
 

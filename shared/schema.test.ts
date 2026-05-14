@@ -40,13 +40,12 @@ describe("basicDetailsSchema", () => {
     expect(() => basicDetailsSchema.parse(invalid)).toThrow();
   });
 
-  it("rejects empty postcode", () => {
+  it("rejects missing date", () => {
     const invalid = {
       fullName: "Test User",
       addressLine1: "1 Test Street",
       city: "London",
-      postcode: "",
-      date: "2026-05-13",
+      postcode: "E1 6AN",
     };
     expect(() => basicDetailsSchema.parse(invalid)).toThrow();
   });
@@ -93,14 +92,24 @@ describe("guardianSchema", () => {
 });
 
 describe("childSchema", () => {
-  it("accepts a valid child", () => {
-    const valid = { id: "c-1", name: "Child One", dateOfBirth: "2020-01-01" };
+  it("accepts a valid male child", () => {
+    const valid = { id: "c-1", name: "Child One", gender: "male", dateOfBirth: "2020-01-01" };
     expect(() => childSchema.parse(valid)).not.toThrow();
   });
 
-  it("accepts a child without optional DOB", () => {
-    const valid = { id: "c-1", name: "Child One" };
+  it("accepts a valid female child", () => {
+    const valid = { id: "c-2", name: "Child Two", gender: "female", dateOfBirth: "2022-03-04" };
     expect(() => childSchema.parse(valid)).not.toThrow();
+  });
+
+  it("rejects a child without a gender", () => {
+    const invalid = { id: "c-3", name: "Child Three", dateOfBirth: "2020-01-01" };
+    expect(() => childSchema.parse(invalid)).toThrow();
+  });
+
+  it("rejects a child without a date of birth", () => {
+    const invalid = { id: "c-4", name: "Child Four", gender: "male" };
+    expect(() => childSchema.parse(invalid)).toThrow();
   });
 });
 
@@ -159,17 +168,22 @@ describe("insertAdminAuditLogSchema", () => {
 
 describe("wasiyyahBeneficiarySchema", () => {
   it("accepts a valid Wasiyyah beneficiary", () => {
-    const valid = { id: "w-1", name: "SDQA Signature Project", percentOrAmount: "10%" };
+    const valid = { id: "w-1", name: "SDQA Signature Project", percentage: 10 };
     expect(() => wasiyyahBeneficiarySchema.parse(valid)).not.toThrow();
   });
 
   it("rejects missing name", () => {
-    const invalid = { id: "w-1", percentOrAmount: "10%" };
+    const invalid = { id: "w-1", percentage: 10 };
     expect(() => wasiyyahBeneficiarySchema.parse(invalid)).toThrow();
   });
 
-  it("rejects missing percentOrAmount", () => {
+  it("rejects missing percentage", () => {
     const invalid = { id: "w-1", name: "SDQA Signature Project" };
+    expect(() => wasiyyahBeneficiarySchema.parse(invalid)).toThrow();
+  });
+
+  it("rejects percentage above the one-third cap (33%)", () => {
+    const invalid = { id: "w-1", name: "Test", percentage: 50 };
     expect(() => wasiyyahBeneficiarySchema.parse(invalid)).toThrow();
   });
 });
