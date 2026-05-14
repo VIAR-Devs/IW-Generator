@@ -25,9 +25,26 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
   res.status(401).json({ message: "Unauthorized" });
 }
 
-// Admin authentication middleware
+// Admin authentication middleware.
+// Source of truth is the ADMIN_EMAILS env var (comma-separated allowlist).
+// Per the Garden Engineering Charter: never an equality check on a single
+// email and never a DB column boolean (which can be mutated outside of a
+// deploy). Re-parsed on every call so env changes via Replit Secrets / Vercel
+// env panel take effect immediately. The legacy `isAdmin` DB column is left
+// in place for the v1 transition window but is not consulted here.
+export function isAdminEmail(email: string | undefined | null): boolean {
+  if (!email) return false;
+  const raw = process.env.ADMIN_EMAILS || "";
+  if (!raw.trim()) return false;
+  const allowlist = raw
+    .split(",")
+    .map((e: string) => e.trim().toLowerCase())
+    .filter(Boolean);
+  return allowlist.includes(email.trim().toLowerCase());
+}
+
 function requireAdmin(req: Request, res: Response, next: NextFunction) {
-  if (req.isAuthenticated() && req.user && req.user.isAdmin === 1) {
+  if (req.isAuthenticated() && req.user && isAdminEmail(req.user.email)) {
     return next();
   }
   res.status(403).json({ message: "Admin access required" });
