@@ -101,7 +101,7 @@ Sub-processors: Neon, Replit, Vercel (target), Anthropic (when conversational la
 |---|---|---|
 | Product lead | Irfan Akram | Strategy + build direction |
 | Operator | Tabs Rashid | Post-launch operator; primary contact for users |
-| Original developer | VIAR-Devs (Faareen) | Repo owner. Garden has collaborator access via gardenprojectx. Ownership transfer to gardenprojectx planned as Charter Item 8 close. |
+| Source-of-truth hosting | Riaz (VIAR-Devs GH org + Replit project) | Riaz holds both today. Garden has collaborator access via gardenprojectx. Transfer to Garden-owned accounts is in flight as Charter Item 6 close. |
 | Cap table | Garden 50% / Shaheb 25% / Tabs 25% | Locked |
 | Engineering | Claude Code under Irfan | Tabs onboarding to Claude Code (Visual Studio + £15/mo subscription) |
 | Legal review | Solicitor-of-record model | Template review by Mariam / BLJ before production release |
