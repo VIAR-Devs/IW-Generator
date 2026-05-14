@@ -6,6 +6,8 @@ import { storage } from "./storage";
 import { z } from "zod";
 import { willFormDataSchema } from "@shared/schema";
 import type { User as DbUser } from "@shared/schema";
+import { adminAuditLog } from "@shared/schema";
+import { db } from "./db";
 import { triggerOnboardingFlow, getOnboardingStats, sendWelcomeEmail, sendBroadcastEmails } from "./services/onboarding";
 import { stripeService } from "./stripeService";
 import { getStripePublishableKey } from "./stripeClient";
@@ -45,6 +47,18 @@ export function isAdminEmail(email: string | undefined | null): boolean {
 
 function requireAdmin(req: Request, res: Response, next: NextFunction) {
   if (req.isAuthenticated() && req.user && isAdminEmail(req.user.email)) {
+    // Charter Item 4: every admin-bypass action must land in the audit log.
+    // Non-blocking — a logging failure must not prevent the admin action,
+    // but we surface it loudly so it cannot go silent.
+    db.insert(adminAuditLog).values({
+      adminEmail: req.user.email,
+      adminUserId: req.user.id,
+      action: `${req.method} ${req.route?.path ?? req.path}`,
+      route: req.originalUrl,
+      ipAddress: req.ip,
+    }).catch((err: unknown) => {
+      console.error("[admin-audit-log] insert failed:", err);
+    });
     return next();
   }
   res.status(403).json({ message: "Admin access required" });
