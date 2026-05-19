@@ -4,7 +4,7 @@ import passport from "passport";
 import bcrypt from "bcryptjs";
 import { storage } from "./storage";
 import { z } from "zod";
-import { willFormDataSchema, users, emailEvents, conversationSessions, gapsAnalysis } from "@shared/schema";
+import { willFormDataSchema, users, emailEvents, conversationSessions, gapsAnalysis, adminAuditLog } from "@shared/schema";
 import type { User as DbUser } from "@shared/schema";
 import { db } from "./db";
 import { desc, count, eq, gte, sql as drizzleSql } from "drizzle-orm";
@@ -27,9 +27,38 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
   res.status(401).json({ message: "Unauthorized" });
 }
 
-// Admin authentication middleware
+// Admin authentication middleware.
+// Source of truth is the ADMIN_EMAILS env var (comma-separated allowlist).
+// Per the Garden Engineering Charter: never an equality check on a single
+// email and never a DB column boolean (which can be mutated outside of a
+// deploy). Re-parsed on every call so env changes via Replit Secrets / Vercel
+// env panel take effect immediately. The legacy `isAdmin` DB column is left
+// in place for the v1 transition window but is not consulted here.
+export function isAdminEmail(email: string | undefined | null): boolean {
+  if (!email) return false;
+  const raw = process.env.ADMIN_EMAILS || "";
+  if (!raw.trim()) return false;
+  const allowlist = raw
+    .split(",")
+    .map((e: string) => e.trim().toLowerCase())
+    .filter(Boolean);
+  return allowlist.includes(email.trim().toLowerCase());
+}
+
 function requireAdmin(req: Request, res: Response, next: NextFunction) {
-  if (req.isAuthenticated() && req.user && req.user.isAdmin === 1) {
+  if (req.isAuthenticated() && req.user && isAdminEmail(req.user.email)) {
+    // Charter Item 4: every admin-bypass action must land in the audit log.
+    // Non-blocking — a logging failure must not prevent the admin action,
+    // but we surface it loudly so it cannot go silent.
+    db.insert(adminAuditLog).values({
+      adminEmail: req.user.email,
+      adminUserId: req.user.id,
+      action: `${req.method} ${req.route?.path ?? req.path}`,
+      route: req.originalUrl,
+      ipAddress: req.ip,
+    }).catch((err: unknown) => {
+      console.error("[admin-audit-log] insert failed:", err);
+    });
     return next();
   }
   res.status(403).json({ message: "Admin access required" });
@@ -150,10 +179,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!req.user) {
       return res.status(401).json({ message: "Not authenticated" });
     }
-    
+
     // Return user without password
     const { passwordHash: _, ...userWithoutPassword } = req.user;
     res.json({ user: userWithoutPassword });
+  });
+
+  // POST /api/auth/consent - Record the current user's GDPR consent
+  // Charter Item 5: every paying user must give explicit consent before
+  // payment is taken. The privacy policy version is captured so a future
+  // material change can re-prompt only the users who haven't yet agreed.
+  app.post("/api/auth/consent", requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const { version } = z.object({
+        version: z.string().min(1).max(20),
+      }).parse(req.body);
+
+      const updated = await storage.recordConsent(req.user.id, version);
+      if (!updated) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const { passwordHash: _, ...userWithoutPassword } = updated;
+      res.json({ user: userWithoutPassword });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      next(error);
+    }
   });
 
   // Will routes

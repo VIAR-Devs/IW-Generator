@@ -9,6 +9,7 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(insertUser: InsertUser): Promise<User>;
   updateUser(id: number, updates: Partial<InsertUser>): Promise<User | undefined>;
+  recordConsent(userId: number, version: string): Promise<User | undefined>;
 
   // Will methods
   getWill(id: number): Promise<Will | undefined>;
@@ -48,6 +49,19 @@ export class DatabaseStorage implements IStorage {
       .update(users)
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(users.id, id))
+      .returning();
+    return user || undefined;
+  }
+
+  async recordConsent(userId: number, version: string): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({
+        gdprConsentAt: new Date(),
+        gdprConsentVersion: version,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
       .returning();
     return user || undefined;
   }
