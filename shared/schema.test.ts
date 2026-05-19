@@ -40,15 +40,15 @@ describe("basicDetailsSchema", () => {
     expect(() => basicDetailsSchema.parse(invalid)).toThrow();
   });
 
-  it("rejects empty postcode", () => {
-    const invalid = {
+  it("accepts payload with empty postcode (postcode is optional per Phase 1)", () => {
+    const valid = {
       fullName: "Test User",
       addressLine1: "1 Test Street",
       city: "London",
       postcode: "",
       date: "2026-05-13",
     };
-    expect(() => basicDetailsSchema.parse(invalid)).toThrow();
+    expect(() => basicDetailsSchema.parse(valid)).not.toThrow();
   });
 
   it("accepts payload without optional burialCountry", () => {
@@ -93,14 +93,19 @@ describe("guardianSchema", () => {
 });
 
 describe("childSchema", () => {
-  it("accepts a valid child", () => {
-    const valid = { id: "c-1", name: "Child One", dateOfBirth: "2020-01-01" };
+  it("accepts a valid child with gender + DOB", () => {
+    const valid = { id: "c-1", name: "Child One", gender: "male", dateOfBirth: "2020-01-01" };
     expect(() => childSchema.parse(valid)).not.toThrow();
   });
 
-  it("accepts a child without optional DOB", () => {
-    const valid = { id: "c-1", name: "Child One" };
-    expect(() => childSchema.parse(valid)).not.toThrow();
+  it("rejects a child missing gender (gender required per Phase 1 — needed for Faraid)", () => {
+    const invalid = { id: "c-1", name: "Child One", dateOfBirth: "2020-01-01" };
+    expect(() => childSchema.parse(invalid)).toThrow();
+  });
+
+  it("rejects a child missing dateOfBirth (now required per Phase 1)", () => {
+    const invalid = { id: "c-1", name: "Child One", gender: "female" };
+    expect(() => childSchema.parse(invalid)).toThrow();
   });
 });
 
@@ -158,18 +163,23 @@ describe("insertAdminAuditLogSchema", () => {
 });
 
 describe("wasiyyahBeneficiarySchema", () => {
-  it("accepts a valid Wasiyyah beneficiary", () => {
-    const valid = { id: "w-1", name: "SDQA Signature Project", percentOrAmount: "10%" };
+  it("accepts a valid Wasiyyah beneficiary (percentage as number, ≤33%)", () => {
+    const valid = { id: "w-1", name: "SDQA Signature Project", percentage: 10 };
     expect(() => wasiyyahBeneficiarySchema.parse(valid)).not.toThrow();
   });
 
   it("rejects missing name", () => {
-    const invalid = { id: "w-1", percentOrAmount: "10%" };
+    const invalid = { id: "w-1", percentage: 10 };
     expect(() => wasiyyahBeneficiarySchema.parse(invalid)).toThrow();
   });
 
-  it("rejects missing percentOrAmount", () => {
+  it("rejects missing percentage", () => {
     const invalid = { id: "w-1", name: "SDQA Signature Project" };
+    expect(() => wasiyyahBeneficiarySchema.parse(invalid)).toThrow();
+  });
+
+  it("rejects percentage above the Islamic 1/3 cap (33%)", () => {
+    const invalid = { id: "w-1", name: "SDQA Signature Project", percentage: 50 };
     expect(() => wasiyyahBeneficiarySchema.parse(invalid)).toThrow();
   });
 });
