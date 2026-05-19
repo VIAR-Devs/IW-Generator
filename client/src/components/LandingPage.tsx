@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { CheckCircle, ArrowRight, Shield, Scale, Clock, FileCheck, Star, Users, Award, Sparkles, FileText, HelpCircle } from "lucide-react";
+import { CheckCircle, ArrowRight, Shield, Scale, Clock, FileCheck, Users, Award, FileText, HelpCircle } from "lucide-react";
 import {
   Accordion,
   AccordionContent,
@@ -41,12 +41,6 @@ function CircleHighlight({ children }: { children: React.ReactNode }) {
     </span>
   );
 }
-import person1 from "@assets/stock_images/diverse_muslim_profe_44eb85f2.jpg";
-import person2 from "@assets/stock_images/diverse_muslim_profe_656d3096.jpg";
-import person3 from "@assets/stock_images/diverse_muslim_profe_65de6527.jpg";
-import person4 from "@assets/stock_images/diverse_muslim_profe_3d12ebda.jpg";
-import person5 from "@assets/stock_images/diverse_muslim_profe_2819c36a.jpg";
-import person6 from "@assets/stock_images/diverse_muslim_profe_76dac33f.jpg";
 import logoImage from "@assets/iwg-logo_1766347750026.png";
 
 export default function LandingPage() {
@@ -79,15 +73,6 @@ export default function LandingPage() {
     setLocation('/my-details');
   };
 
-  const trustedPeople = [
-    { src: person1, alt: "Community member" },
-    { src: person2, alt: "Community member" },
-    { src: person3, alt: "Community member" },
-    { src: person4, alt: "Community member" },
-    { src: person5, alt: "Community member" },
-    { src: person6, alt: "Community member" },
-  ];
-
   const features = [
     {
       icon: Shield,
@@ -111,34 +96,6 @@ export default function LandingPage() {
     },
   ];
 
-  const stats = [
-    { value: "1,000+", label: "Wills Created" },
-    { value: "15 min", label: "Average Time" },
-    { value: "4.9/5", label: "Customer Rating" },
-    { value: "100%", label: "Shariah Compliant" },
-  ];
-
-  const testimonials = [
-    {
-      name: "Fatima Ahmed",
-      location: "London",
-      text: "Finally, a simple way to create an Islamic will that I can trust. The process was so easy and the result is exactly what I needed.",
-      rating: 5,
-    },
-    {
-      name: "Mohammed Hassan",
-      location: "Birmingham",
-      text: "I've been meaning to write my will for years. This tool made it happen in one evening. Highly recommend to all Muslims in the UK.",
-      rating: 5,
-    },
-    {
-      name: "Aisha Rahman",
-      location: "Manchester",
-      text: "The step-by-step guidance gave me confidence that my will follows both Islamic principles and UK law. Peace of mind achieved.",
-      rating: 5,
-    },
-  ];
-
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -155,8 +112,6 @@ export default function LandingPage() {
           <nav className="hidden md:flex items-center gap-6">
             <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors" data-testid="link-features">Features</a>
             <a href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors" data-testid="link-how-it-works">How It Works</a>
-            <a href="#testimonials" className="text-sm text-muted-foreground hover:text-foreground transition-colors" data-testid="link-testimonials">Testimonials</a>
-            <Link href="/one-nation" className="text-sm text-muted-foreground hover:text-foreground transition-colors" data-testid="link-one-nation">O-N</Link>
           </nav>
 
           <div className="flex items-center gap-3">
@@ -214,11 +169,6 @@ export default function LandingPage() {
       {/* Hero Section with Inline Generator */}
       <section className="py-16 sm:py-24 lg:py-32">
         <div className="max-w-4xl mx-auto px-6 text-center">
-          <Badge variant="secondary" className="mb-6 px-4 py-1.5" data-testid="badge-announcement">
-            <Sparkles className="w-3.5 h-3.5 mr-1.5" />
-            Trusted by 1,000+ Muslims across the UK
-          </Badge>
-          
           <Squiggle />
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-foreground mb-6 tracking-tight">
             Create Your <Highlight>Islamic Will</Highlight>{" "}
@@ -268,52 +218,6 @@ export default function LandingPage() {
               </div>
             </div>
           </Card>
-        </div>
-      </section>
-
-      {/* Trusted By Section */}
-      <section className="py-12 border-y bg-muted/30">
-        <div className="max-w-5xl mx-auto px-6">
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-            <div className="flex -space-x-3">
-              {trustedPeople.map((person, i) => (
-                <div
-                  key={i}
-                  className="w-10 h-10 rounded-full border-2 border-background overflow-hidden"
-                  data-testid={`avatar-trusted-${i}`}
-                >
-                  <img
-                    src={person.src}
-                    alt={person.alt}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              ))}
-            </div>
-            <div className="text-center sm:text-left">
-              <p className="font-semibold text-foreground">Trusted by Muslims across the UK</p>
-              <div className="flex items-center justify-center sm:justify-start gap-1 mt-1">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="w-4 h-4 fill-accent text-accent" />
-                ))}
-                <span className="text-sm text-muted-foreground ml-2">4.9/5 from 500+ reviews</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Stats Section */}
-      <section className="py-16 sm:py-20">
-        <div className="max-w-5xl mx-auto px-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {stats.map((stat, i) => (
-              <div key={i} className="text-center" data-testid={`stat-${i}`}>
-                <div className="text-3xl sm:text-4xl font-bold text-foreground">{stat.value}</div>
-                <div className="text-sm text-muted-foreground mt-1">{stat.label}</div>
-              </div>
-            ))}
-          </div>
         </div>
       </section>
 
@@ -394,37 +298,6 @@ export default function LandingPage() {
                 </div>
               ))}
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials Section */}
-      <section id="testimonials" className="py-16 sm:py-24 bg-muted/30">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">
-              Loved by <Highlight>our community</Highlight>
-            </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              See what other Muslims in the UK have to say about their experience.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-6">
-            {testimonials.map((testimonial, i) => (
-              <Card key={i} className="p-6" data-testid={`testimonial-card-${i}`}>
-                <div className="flex gap-1 mb-4">
-                  {[...Array(testimonial.rating)].map((_, j) => (
-                    <Star key={j} className="w-4 h-4 fill-accent text-accent" />
-                  ))}
-                </div>
-                <p className="text-foreground mb-4">"{testimonial.text}"</p>
-                <div>
-                  <p className="font-semibold text-foreground">{testimonial.name}</p>
-                  <p className="text-sm text-muted-foreground">{testimonial.location}</p>
-                </div>
-              </Card>
-            ))}
           </div>
         </div>
       </section>
