@@ -4,10 +4,10 @@ import passport from "passport";
 import bcrypt from "bcryptjs";
 import { storage } from "./storage";
 import { z } from "zod";
-import { willFormDataSchema } from "@shared/schema";
+import { willFormDataSchema, users, emailEvents, conversationSessions, gapsAnalysis, adminAuditLog } from "@shared/schema";
 import type { User as DbUser } from "@shared/schema";
-import { adminAuditLog } from "@shared/schema";
 import { db } from "./db";
+import { desc, count, eq, gte, sql as drizzleSql } from "drizzle-orm";
 import { triggerOnboardingFlow, getOnboardingStats, sendWelcomeEmail, sendBroadcastEmails } from "./services/onboarding";
 import { stripeService } from "./stripeService";
 import { getStripePublishableKey } from "./stripeClient";
@@ -408,6 +408,239 @@ export async function registerRoutes(app: Express): Promise<Server> {
       next(error);
     }
   });
+
+  // Contact form route
+
+  // POST /api/contact - Submit contact form message
+  app.post("/api/contact", async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { name, email, message } = z.object({
+        name: z.string().min(1, "Name is required"),
+        email: z.string().email("Valid email required"),
+        message: z.string().min(1, "Message is required"),
+      }).parse(req.body);
+
+      const { getUncachableResendClient } = await import("./services/resend-client");
+
+      const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      const teamEmail = process.env.ASSISTANCE_NOTIFICATION_EMAIL || 'tab_rashid@hotmail.co.uk';
+      const { client, fromEmail } = await getUncachableResendClient();
+
+      await client.emails.send({
+        from: fromEmail,
+        to: teamEmail,
+        subject: `[IW Contact] Message from ${name}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #1a5c2e;">Contact Form Message</h2>
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 16px 0;">
+              <p><strong>Name:</strong> ${esc(name)}</p>
+              <p><strong>Email:</strong> <a href="mailto:${esc(email)}">${esc(email)}</a></p>
+              <p><strong>Message:</strong></p>
+              <p style="white-space: pre-wrap;">${esc(message)}</p>
+            </div>
+          </div>
+        `,
+        text: `Contact Form Message\n\nName: ${name}\nEmail: ${email}\nMessage: ${message}`,
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      next(error);
+    }
+  });
+
+  // Assistance Request routes (Route 2 & 3 - personal guidance)
+
+  // POST /api/assistance-request - Submit request for personal guidance
+  app.post("/api/assistance-request", async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { name, email, phone, message, currentStep } = z.object({
+        name: z.string().min(1, "Name is required"),
+        email: z.string().email("Valid email required"),
+        phone: z.string().min(1, "Phone number is required"),
+        message: z.string().optional(),
+        currentStep: z.number().min(1).max(9),
+      }).parse(req.body);
+
+      const request = await storage.createAssistanceRequest({
+        name,
+        email,
+        phone,
+        message: message || null,
+        currentStep,
+        willId: null,
+        status: "pending",
+        resolvedAt: null,
+      });
+
+      // Send notification email to team (Tabs)
+      const { sendAssistanceNotification } = await import("./services/onboarding");
+      sendAssistanceNotification({ name, email, phone, message, currentStep }).catch((error) => {
+        console.error('Assistance notification email error:', error);
+      });
+
+      res.json({ success: true, requestId: request.id });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      next(error);
+    }
+  });
+
+  // GET /api/admin/assistance-requests - Get all assistance requests (ADMIN ONLY)
+  app.get("/api/admin/assistance-requests", requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const requests = await storage.getAssistanceRequests();
+      res.json({ requests });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // PATCH /api/admin/assistance-requests/:id - Update request status (ADMIN ONLY)
+  app.patch("/api/admin/assistance-requests/:id", requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { status } = z.object({
+        status: z.enum(["pending", "contacted", "resolved"]),
+      }).parse(req.body);
+
+      const updated = await storage.updateAssistanceRequest(id, {
+        status,
+        resolvedAt: status === "resolved" ? new Date() : null,
+      });
+      res.json({ request: updated });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      next(error);
+    }
+  });
+
+  // ─── Phase 1 admin endpoints (iw-025) ────────────────────────────────────
+
+  // GET /api/admin/engagement-stats — aggregate email engagement metrics
+  app.get("/api/admin/engagement-stats", requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+      // All-time counts by event_type
+      const allTimeByType = await db
+        .select({ eventType: emailEvents.eventType, n: count() })
+        .from(emailEvents)
+        .groupBy(emailEvents.eventType);
+
+      // Last-30-days counts by event_type
+      const last30ByType = await db
+        .select({ eventType: emailEvents.eventType, n: count() })
+        .from(emailEvents)
+        .where(gte(emailEvents.occurredAt, thirtyDaysAgo))
+        .groupBy(emailEvents.eventType);
+
+      // Per-template breakdown (using metadata.template_key). We pull the raw rows
+      // and aggregate in JS — simpler than jsonb group-by for v1 volumes.
+      const recentRows = await db
+        .select({
+          eventType: emailEvents.eventType,
+          metadata: emailEvents.metadata,
+        })
+        .from(emailEvents)
+        .where(gte(emailEvents.occurredAt, thirtyDaysAgo))
+        .limit(10000);
+
+      const perTemplate: Record<string, Record<string, number>> = {};
+      for (const row of recentRows) {
+        const tk = (row.metadata as any)?.template_key as string | undefined;
+        if (!tk) continue;
+        if (!perTemplate[tk]) perTemplate[tk] = {};
+        perTemplate[tk][row.eventType] = (perTemplate[tk][row.eventType] ?? 0) + 1;
+      }
+
+      // User-side engagement summary
+      const [userEngagement] = await db
+        .select({
+          totalUsers: count(),
+          totalOpens: drizzleSql<number>`COALESCE(SUM(${users.openCount}), 0)`,
+          totalClicks: drizzleSql<number>`COALESCE(SUM(${users.clickCount}), 0)`,
+          bounced: drizzleSql<number>`COUNT(CASE WHEN ${users.bounceStatus} IS NOT NULL THEN 1 END)`,
+          unsubscribed: drizzleSql<number>`COUNT(CASE WHEN ${users.unsubscribedAt} IS NOT NULL THEN 1 END)`,
+        })
+        .from(users);
+
+      res.json({
+        allTime: Object.fromEntries(allTimeByType.map((r) => [r.eventType, Number(r.n)])),
+        last30Days: Object.fromEntries(last30ByType.map((r) => [r.eventType, Number(r.n)])),
+        perTemplate,
+        userEngagement,
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // GET /api/admin/conversation-sessions — recent conversation sessions
+  app.get("/api/admin/conversation-sessions", requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const limit = Math.min(parseInt(String(req.query.limit ?? "50"), 10) || 50, 200);
+
+      const rows = await db
+        .select({
+          id: conversationSessions.id,
+          userId: conversationSessions.userId,
+          sessionToken: conversationSessions.sessionToken,
+          journeyType: conversationSessions.journeyType,
+          currentBeat: conversationSessions.currentBeat,
+          beatsCompleted: conversationSessions.beatsCompleted,
+          startedAt: conversationSessions.startedAt,
+          lastActivityAt: conversationSessions.lastActivityAt,
+          completedAt: conversationSessions.completedAt,
+          abandonedAt: conversationSessions.abandonedAt,
+          recoveredAt: conversationSessions.recoveredAt,
+        })
+        .from(conversationSessions)
+        .orderBy(desc(conversationSessions.lastActivityAt))
+        .limit(limit);
+
+      res.json({ sessions: rows });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // GET /api/admin/gaps-analysis — recent gap analyses with counts
+  app.get("/api/admin/gaps-analysis", requireAdmin, async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const limit = Math.min(parseInt(String(req.query.limit ?? "50"), 10) || 50, 200);
+
+      const rows = await db
+        .select()
+        .from(gapsAnalysis)
+        .orderBy(desc(gapsAnalysis.generatedAt))
+        .limit(limit);
+
+      // Aggregate counts by gap_type across the returned window
+      const byGapType: Record<string, number> = {};
+      const byRoute: Record<string, number> = {};
+      for (const row of rows) {
+        for (const g of (row.gaps || [])) {
+          byGapType[g.gap_type] = (byGapType[g.gap_type] ?? 0) + 1;
+          byRoute[g.recommended_route] = (byRoute[g.recommended_route] ?? 0) + 1;
+        }
+      }
+
+      res.json({ analyses: rows, summary: { byGapType, byRoute, count: rows.length } });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // ─── end Phase 1 admin endpoints ─────────────────────────────────────────
 
   // Stripe Payment Routes
 

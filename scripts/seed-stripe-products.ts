@@ -43,10 +43,10 @@ async function createIslamicWillProduct() {
 
   console.log('Product created:', product.id);
 
-  // Create the price (one-time payment of £49.99)
+  // Create the price (one-time payment of £50)
   const price = await stripe.prices.create({
     product: product.id,
-    unit_amount: 4999, // £49.99 in pence
+    unit_amount: 5000, // £50 in pence
     currency: 'gbp',
   });
 

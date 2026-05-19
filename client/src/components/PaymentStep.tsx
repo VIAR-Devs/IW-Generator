@@ -139,7 +139,7 @@ export default function PaymentStep({ onBack, onAuthSuccess, onPayment }: Paymen
             <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="font-medium text-foreground">Islamic Will Document</span>
-                <span className="text-2xl font-bold text-foreground">£49.99</span>
+                <span className="text-2xl font-bold text-foreground">£50</span>
               </div>
               <ul className="text-sm text-muted-foreground space-y-1 mt-3">
                 <li className="flex items-start gap-2">

@@ -11,8 +11,9 @@ import OptionalAddOnsStep from "@/components/OptionalAddOnsStep";
 import ReviewStep from "@/components/ReviewStep";
 import PaymentStep from "@/components/PaymentStep";
 import SaveProgressDialog from "@/components/SaveProgressDialog";
+import NeedHelpDialog from "@/components/NeedHelpDialog";
 import { WillFormData, Executor, Guardian, Child, Wasiyyah } from "@shared/schema";
-import { FileText, ArrowLeft } from "lucide-react";
+import { FileText, ArrowLeft, HelpCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useWillDraft } from "@/hooks/use-wills";
 import { Button } from "@/components/ui/button";
@@ -33,6 +34,7 @@ const steps = [
 export default function CreateWill() {
   const [currentStep, setCurrentStep] = useState(1);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [showHelpDialog, setShowHelpDialog] = useState(false);
   const { toast } = useToast();
   const { createWill, isCreating } = useWillDraft();
   const [, setLocation] = useLocation();
@@ -280,10 +282,32 @@ export default function CreateWill() {
         </div>
       </main>
 
+      {/* Need Help floating button - visible on all steps except payment */}
+      {currentStep < 9 && (
+        <div className="fixed bottom-6 right-6 z-40">
+          <Button
+            onClick={() => setShowHelpDialog(true)}
+            variant="outline"
+            className="rounded-full shadow-lg border-primary/30 bg-background hover:bg-primary/5 px-4 py-2 flex items-center gap-2"
+          >
+            <HelpCircle className="w-4 h-4 text-primary" />
+            <span className="text-sm font-medium">Need Help?</span>
+          </Button>
+        </div>
+      )}
+
       <SaveProgressDialog
         open={showSaveDialog}
         onClose={() => setShowSaveDialog(false)}
         onSave={handleCreateAccount}
+      />
+
+      <NeedHelpDialog
+        open={showHelpDialog}
+        onClose={() => setShowHelpDialog(false)}
+        currentStep={currentStep}
+        userName={formData.basicDetails.fullName}
+        userEmail=""
       />
     </div>
   );

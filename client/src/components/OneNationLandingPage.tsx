@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { CheckCircle, ArrowRight, Shield, Scale, Clock, FileCheck, Star, Users, Award, Sparkles, FileText, Heart, Globe, Droplets, GraduationCap, Home as HomeIcon } from "lucide-react";
+import { CheckCircle, ArrowRight, Shield, Scale, Clock, FileCheck, Users, Award, Sparkles, FileText, Heart, Globe, Droplets, GraduationCap, Home as HomeIcon } from "lucide-react";
 import {
   Accordion,
   AccordionContent,
@@ -42,12 +42,6 @@ function CircleHighlight({ children }: { children: React.ReactNode }) {
   );
 }
 
-import person1 from "@assets/stock_images/diverse_muslim_profe_44eb85f2.jpg";
-import person2 from "@assets/stock_images/diverse_muslim_profe_656d3096.jpg";
-import person3 from "@assets/stock_images/diverse_muslim_profe_65de6527.jpg";
-import person4 from "@assets/stock_images/diverse_muslim_profe_3d12ebda.jpg";
-import person5 from "@assets/stock_images/diverse_muslim_profe_2819c36a.jpg";
-import person6 from "@assets/stock_images/diverse_muslim_profe_76dac33f.jpg";
 import oneNationLogo from "@assets/o-n-logo_1766184971803.png";
 import logoImage from "@assets/iwg-logo_1766347750026.png";
 
@@ -81,15 +75,6 @@ export default function OneNationLandingPage() {
     sessionStorage.setItem('willPartner', 'one-nation');
     setLocation('/my-details');
   };
-
-  const trustedPeople = [
-    { src: person1, alt: "Community member" },
-    { src: person2, alt: "Community member" },
-    { src: person3, alt: "Community member" },
-    { src: person4, alt: "Community member" },
-    { src: person5, alt: "Community member" },
-    { src: person6, alt: "Community member" },
-  ];
 
   const howItWorks = [
     {
@@ -262,7 +247,7 @@ export default function OneNationLandingPage() {
               <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground pt-2">
                 <span className="flex items-center gap-1.5">
                   <CheckCircle className="w-4 h-4 text-accent" />
-                  Only £49
+                  Only £50
                 </span>
                 <span className="flex items-center gap-1.5">
                   <CheckCircle className="w-4 h-4 text-accent" />
@@ -296,38 +281,6 @@ export default function OneNationLandingPage() {
             <Sparkles className="w-4 h-4 mr-2" />
             One action. Lasting impact.
           </Badge>
-        </div>
-      </section>
-
-      {/* Trusted By Section */}
-      <section className="py-12 bg-background">
-        <div className="max-w-5xl mx-auto px-6">
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-            <div className="flex -space-x-3">
-              {trustedPeople.map((person, i) => (
-                <div
-                  key={i}
-                  className="w-10 h-10 rounded-full border-2 border-background overflow-hidden"
-                  data-testid={`avatar-trusted-${i}`}
-                >
-                  <img
-                    src={person.src}
-                    alt={person.alt}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              ))}
-            </div>
-            <div className="text-center sm:text-left">
-              <p className="font-semibold text-foreground">Trusted by Muslims across the UK</p>
-              <div className="flex items-center justify-center sm:justify-start gap-1 mt-1">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="w-4 h-4 fill-accent text-accent" />
-                ))}
-                <span className="text-sm text-muted-foreground ml-2">4.9/5 from 500+ reviews</span>
-              </div>
-            </div>
-          </div>
         </div>
       </section>
 
@@ -481,7 +434,7 @@ export default function OneNationLandingPage() {
             <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
           <p className="text-sm opacity-60 mt-4">
-            Only £49 - 25% donated to One Nation
+            Only £50 - 25% donated to One Nation
           </p>
         </div>
       </section>

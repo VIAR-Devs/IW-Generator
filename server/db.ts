@@ -29,14 +29,16 @@ export type Tx = PgTransaction<NeonQueryResultHKT, Schema, ExtractTablesWithRela
 // RUNBOOK "RLS role swap"), all PII-touching storage methods must run inside
 // withUserContext(). Before the role swap this is a no-op safety net.
 export async function withUserContext<T>(
-  context: { userId: number | null; isAdmin: boolean },
+  context: { userId: number | null; isAdmin: boolean; sessionToken?: string | null },
   fn: (tx: Tx) => Promise<T>,
 ): Promise<T> {
   return db.transaction(async (tx) => {
     const userIdStr = context.userId === null ? "" : String(context.userId);
     const isAdminStr = context.isAdmin ? "true" : "false";
+    const sessionTokenStr = context.sessionToken ?? "";
     await tx.execute(sql`SELECT set_config('app.user_id', ${userIdStr}, true)`);
     await tx.execute(sql`SELECT set_config('app.is_admin', ${isAdminStr}, true)`);
+    await tx.execute(sql`SELECT set_config('app.session_token', ${sessionTokenStr}, true)`);
     return fn(tx);
   });
 }

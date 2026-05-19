@@ -1,5 +1,5 @@
 // Database storage implementation - referenced from blueprint:javascript_database
-import { users, wills, type User, type InsertUser, type Will, type InsertWill } from "@shared/schema";
+import { users, wills, assistanceRequests, type User, type InsertUser, type Will, type InsertWill, type AssistanceRequest, type InsertAssistanceRequest } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
 
@@ -17,6 +17,11 @@ export interface IStorage {
   createWill(insertWill: InsertWill): Promise<Will>;
   updateWill(id: number, updates: Partial<InsertWill>): Promise<Will | undefined>;
   deleteWill(id: number): Promise<boolean>;
+
+  // Assistance Request methods
+  createAssistanceRequest(data: InsertAssistanceRequest): Promise<AssistanceRequest>;
+  getAssistanceRequests(): Promise<AssistanceRequest[]>;
+  updateAssistanceRequest(id: number, updates: Partial<InsertAssistanceRequest>): Promise<AssistanceRequest | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -95,6 +100,31 @@ export class DatabaseStorage implements IStorage {
   async deleteWill(id: number): Promise<boolean> {
     const result = await db.delete(wills).where(eq(wills.id, id));
     return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Assistance Request methods
+  async createAssistanceRequest(data: InsertAssistanceRequest): Promise<AssistanceRequest> {
+    const [request] = await db
+      .insert(assistanceRequests)
+      .values(data as any)
+      .returning();
+    return request;
+  }
+
+  async getAssistanceRequests(): Promise<AssistanceRequest[]> {
+    return await db
+      .select()
+      .from(assistanceRequests)
+      .orderBy(desc(assistanceRequests.createdAt));
+  }
+
+  async updateAssistanceRequest(id: number, updates: Partial<InsertAssistanceRequest>): Promise<AssistanceRequest | undefined> {
+    const [request] = await db
+      .update(assistanceRequests)
+      .set(updates as any)
+      .where(eq(assistanceRequests.id, id))
+      .returning();
+    return request || undefined;
   }
 }
 

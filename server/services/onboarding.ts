@@ -1,4 +1,5 @@
 import { getUncachableResendClient } from './resend-client';
+import { logSentEmail } from './email-events';
 import { getWelcomeEmailHtml, getWelcomeEmailText } from '../templates/welcome-email';
 import { getFollowUpEmailHtml, getFollowUpEmailText } from '../templates/follow-up-email';
 import { getBroadcastEmailHtml, getBroadcastEmailText } from '../templates/broadcast-email';
@@ -34,10 +35,11 @@ export async function sendWelcomeEmail(
   try {
     const { client, fromEmail } = await getUncachableResendClient();
     
+    const welcomeSubject = 'Welcome to Islamic Wills - Complete Your Will in 10 Minutes';
     const result = await client.emails.send({
       from: fromEmail,
       to: email,
-      subject: 'Welcome to Islamic Wills - Complete Your Will in 10 Minutes',
+      subject: welcomeSubject,
       html: getWelcomeEmailHtml(fullName),
       text: getWelcomeEmailText(fullName),
     });
@@ -45,6 +47,13 @@ export async function sendWelcomeEmail(
     if (result.error) {
       throw new Error(result.error.message);
     }
+
+    await logSentEmail({
+      messageId: result.data?.id ?? null,
+      subject: welcomeSubject,
+      recipientEmail: email,
+      templateKey: 'welcome',
+    });
 
     emailStats.welcomeEmailsSent++;
     console.log(`Welcome email sent successfully to ${email}`);
@@ -72,10 +81,11 @@ export async function sendFollowUpEmail(
   try {
     const { client, fromEmail } = await getUncachableResendClient();
     
+    const followUpSubject = 'Ready to Complete Your Islamic Will?';
     const result = await client.emails.send({
       from: fromEmail,
       to: email,
-      subject: 'Ready to Complete Your Islamic Will?',
+      subject: followUpSubject,
       html: getFollowUpEmailHtml(fullName),
       text: getFollowUpEmailText(fullName),
     });
@@ -83,6 +93,13 @@ export async function sendFollowUpEmail(
     if (result.error) {
       throw new Error(result.error.message);
     }
+
+    await logSentEmail({
+      messageId: result.data?.id ?? null,
+      subject: followUpSubject,
+      recipientEmail: email,
+      templateKey: 'follow_up',
+    });
 
     emailStats.followUpEmailsSent++;
     console.log(`Follow-up email sent successfully to ${email}`);
@@ -294,11 +311,20 @@ export async function sendBroadcastEmails(
             html: getBroadcastEmailHtml(subject, message, user.fullName),
             text: getBroadcastEmailText(subject, message, user.fullName),
           });
-          
+
           if (result.error) {
             throw new Error(result.error.message);
           }
-          
+
+          await logSentEmail({
+            userId: user.id,
+            messageId: result.data?.id ?? null,
+            subject,
+            recipientEmail: user.email,
+            templateKey: 'broadcast',
+            metadata: { filter: userFilter },
+          });
+
           totalSent++;
           return { success: true, email: user.email };
         } catch (error: any) {
@@ -328,6 +354,65 @@ export async function sendBroadcastEmails(
   } catch (error: any) {
     console.error('Error in sendBroadcastEmails:', error.message);
     throw error;
+  }
+}
+
+// Send notification to team (Tabs) when user requests personal guidance
+export async function sendAssistanceNotification(data: {
+  name: string;
+  email: string;
+  phone: string;
+  message?: string;
+  currentStep: number;
+}): Promise<{ success: boolean; error?: string }> {
+  const stepNames = [
+    '', 'Basic Details', 'Executors', 'Guardians', 'Funeral Preferences',
+    'Wasiyyah', 'Heirs Snapshot', 'Optional Add-Ons', 'Review', 'Payment'
+  ];
+
+  const stepName = stepNames[data.currentStep] || `Step ${data.currentStep}`;
+  const teamEmail = process.env.ASSISTANCE_NOTIFICATION_EMAIL || 'tab_rashid@hotmail.co.uk';
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+  try {
+    const { client, fromEmail } = await getUncachableResendClient();
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #1a5c2e;">New Assistance Request - Islamic Will Generator</h2>
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 16px 0;">
+          <p><strong>Name:</strong> ${esc(data.name)}</p>
+          <p><strong>Email:</strong> <a href="mailto:${esc(data.email)}">${esc(data.email)}</a></p>
+          <p><strong>Phone:</strong> <a href="tel:${esc(data.phone)}">${esc(data.phone)}</a></p>
+          <p><strong>Stopped at:</strong> ${stepName} (step ${data.currentStep} of 9)</p>
+          ${data.message ? `<p><strong>Message:</strong> ${esc(data.message)}</p>` : ''}
+        </div>
+        <p>This person started creating their Islamic Will online and has requested personal guidance. Please contact them within 24 hours.</p>
+        <p style="color: #666; font-size: 12px; margin-top: 24px;">
+          Sent from Islamic Will Generator - <a href="https://iw-generator.replit.app/admin">View Dashboard</a>
+        </p>
+      </div>
+    `;
+
+    const text = `New Assistance Request - Islamic Will Generator\n\nName: ${data.name}\nEmail: ${data.email}\nPhone: ${data.phone}\nStopped at: ${stepName} (step ${data.currentStep} of 9)\n${data.message ? `Message: ${data.message}\n` : ''}\nPlease contact them within 24 hours.`;
+
+    const result = await client.emails.send({
+      from: fromEmail,
+      to: teamEmail,
+      subject: `[IW] Assistance Request from ${data.name} - stopped at ${stepName}`,
+      html,
+      text,
+    });
+
+    if (result.error) {
+      throw new Error(result.error.message);
+    }
+
+    console.log(`Assistance notification sent to ${teamEmail} for ${data.name}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error(`Failed to send assistance notification for ${data.name}:`, error.message);
+    return { success: false, error: error.message };
   }
 }
 

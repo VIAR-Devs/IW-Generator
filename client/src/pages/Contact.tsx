@@ -26,17 +26,33 @@ export default function Contact() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
-    // Simulate form submission
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    toast({
-      title: "Message sent",
-      description: "Thank you for your message. We'll get back to you soon.",
-    });
-    
-    setFormData({ name: "", email: "", message: "" });
-    setIsSubmitting(false);
+
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to send message');
+      }
+
+      toast({
+        title: "Message sent",
+        description: "Thank you for your message. We'll get back to you within 24-48 hours.",
+      });
+
+      setFormData({ name: "", email: "", message: "" });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to send message. Please try again or email us directly.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleGetStartedClick = () => {
@@ -237,7 +253,7 @@ export default function Contact() {
             <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
           <p className="text-sm opacity-60 mt-4">
-            Only £49 - Save progress & Update anytime
+            Only £50 - Save progress & Update anytime
           </p>
         </div>
       </section>
